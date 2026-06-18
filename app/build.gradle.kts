@@ -44,8 +44,8 @@ dependencies {
     implementation(project(":core:core-network"))
     implementation(project(":core:core-database"))
     implementation(project(":core:core-ui"))
-    // implementation(project(":domain"))  // TODO: módulo pendiente
-    // implementation(project(":data"))  // TODO: módulo pendiente
+    implementation(project(":domain"))
+    implementation(project(":data"))
     // implementation(project(":feature:feature-downloads"))  // TODO: módulo pendiente
     // implementation(project(":feature:feature-browser"))  // TODO: módulo pendiente
     // implementation(project(":feature:feature-history"))  // TODO: módulo pendiente
