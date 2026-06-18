@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio
+*.iml
+.idea/
+local.properties
+
+# Keystore
+*.jks
+*.keystore
+
+# Generated
+**/generated/
+
+# OS
+.DS_Store
+Thumbs.db
+*.hprof
