@@ -46,10 +46,10 @@ dependencies {
     implementation(project(":core:core-ui"))
     implementation(project(":domain"))
     implementation(project(":data"))
-    // implementation(project(":feature:feature-downloads"))  // TODO: módulo pendiente
-    // implementation(project(":feature:feature-browser"))  // TODO: módulo pendiente
+    implementation(project(":feature:feature-downloads"))
+    implementation(project(":feature:feature-browser"))
     // implementation(project(":feature:feature-history"))  // TODO: módulo pendiente
-    // implementation(project(":feature:feature-media"))  // TODO: módulo pendiente
+    implementation(project(":feature:feature-media"))
     // implementation(project(":feature:feature-settings"))  // TODO: módulo pendiente
 
     implementation(libs.core.ktx)
