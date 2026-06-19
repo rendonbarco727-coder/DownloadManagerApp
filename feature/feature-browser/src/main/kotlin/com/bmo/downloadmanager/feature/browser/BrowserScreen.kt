@@ -25,75 +25,102 @@ fun BrowserScreen(
     viewModel: BrowserViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Barra superior
-        Surface(
-            tonalElevation = 3.dp,
-            modifier = Modifier.fillMaxWidth(),
+    LaunchedEffect(uiState.downloadStartedMessage) {
+        val message = uiState.downloadStartedMessage
+        if (message != null) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.consumeDownloadStartedMessage()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { scaffoldPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(scaffoldPadding),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            // Barra superior
+            Surface(
+                tonalElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                OutlinedTextField(
-                    value = uiState.urlBarText,
-                    onValueChange = viewModel::onUrlBarTextChange,
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    placeholder = { Text("Buscar o escribir URL") },
-                    shape = RoundedCornerShape(24.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(
-                        onGo = { viewModel.navigateTo(uiState.urlBarText) }
-                    ),
-                    textStyle = MaterialTheme.typography.bodySmall,
-                )
-                TextButton(onClick = viewModel::newTab) {
-                    Text("+", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    OutlinedTextField(
+                        value = uiState.urlBarText,
+                        onValueChange = viewModel::onUrlBarTextChange,
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        placeholder = { Text("Buscar o escribir URL") },
+                        shape = RoundedCornerShape(24.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(
+                            onGo = { viewModel.navigateTo(uiState.urlBarText) }
+                        ),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = viewModel::newTab) {
+                        Text("+", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
-        }
 
-        // Indicador de carga
-        if (uiState.isLoading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
+            // Indicador de carga
+            if (uiState.isLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
 
-        // Tabs row
-        if (uiState.tabs.size > 1) {
-            TabsRow(
-                tabs = uiState.tabs,
-                activeTab = uiState.activeTab,
-                onClose = viewModel::closeTab,
-            )
-        }
-
-        // WebView
-        val currentUrl = uiState.activeTab?.currentUrl
-        if (currentUrl != null) {
-            BrowserWebView(
-                url = currentUrl,
-                modifier = Modifier.weight(1f),
-                onPageStarted = viewModel::onPageStarted,
-                onPageFinished = viewModel::onPageLoadFinished,
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Escribe una URL o búsqueda arriba",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Tabs row
+            if (uiState.tabs.size > 1) {
+                TabsRow(
+                    tabs = uiState.tabs,
+                    activeTab = uiState.activeTab,
+                    onClose = viewModel::closeTab,
                 )
+            }
+
+            // WebView
+            val currentUrl = uiState.activeTab?.currentUrl
+            if (currentUrl != null) {
+                BrowserWebView(
+                    url = currentUrl,
+                    modifier = Modifier.weight(1f),
+                    onPageStarted = viewModel::onPageStarted,
+                    onPageFinished = viewModel::onPageLoadFinished,
+                    onDownloadRequested = { downloadUrl, userAgent, contentDisposition, mimeType, contentLength, pageUrl ->
+                        viewModel.enqueueDownload(
+                            url = downloadUrl,
+                            userAgent = userAgent,
+                            contentDisposition = contentDisposition,
+                            mimeType = mimeType,
+                            contentLength = contentLength,
+                            pageUrl = pageUrl,
+                        )
+                    },
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Escribe una URL o búsqueda arriba",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -143,6 +170,14 @@ private fun BrowserWebView(
     modifier: Modifier = Modifier,
     onPageStarted: () -> Unit,
     onPageFinished: (String, String?) -> Unit,
+    onDownloadRequested: (
+        url: String,
+        userAgent: String?,
+        contentDisposition: String?,
+        mimeType: String?,
+        contentLength: Long,
+        pageUrl: String?,
+    ) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
 
@@ -162,6 +197,22 @@ private fun BrowserWebView(
                     }
                 }
                 webChromeClient = WebChromeClient()
+                // DownloadListener captura cualquier respuesta que el
+                // WebView no puede renderizar él mismo (típicamente
+                // Content-Disposition: attachment, o un mimeType que no es
+                // HTML/imagen/etc). pageUrl se toma de this.url, que en
+                // este callback ya apunta a la página que originó la
+                // descarga -- se usa como Referer en DownloadManager.
+                setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, contentLength ->
+                    onDownloadRequested(
+                        downloadUrl,
+                        userAgent,
+                        contentDisposition,
+                        mimeType,
+                        contentLength,
+                        this.url,
+                    )
+                }
                 loadUrl(url)
                 webView = this
             }

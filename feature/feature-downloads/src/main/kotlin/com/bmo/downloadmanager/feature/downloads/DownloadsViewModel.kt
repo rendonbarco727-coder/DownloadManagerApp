@@ -3,6 +3,7 @@ package com.bmo.downloadmanager.feature.downloads
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bmo.downloadmanager.core.common.result.AppResult
+import com.bmo.downloadmanager.core.downloader.manager.DownloadManager
 import com.bmo.downloadmanager.domain.model.Download
 import com.bmo.downloadmanager.domain.usecase.download.DeleteDownloadUseCase
 import com.bmo.downloadmanager.domain.usecase.download.GetDownloadsUseCase
@@ -24,6 +25,7 @@ sealed interface DownloadsUiState {
 class DownloadsViewModel @Inject constructor(
     private val getDownloadsUseCase: GetDownloadsUseCase,
     private val deleteDownloadUseCase: DeleteDownloadUseCase,
+    private val downloadManager: DownloadManager,
 ) : ViewModel() {
 
     val uiState: StateFlow<DownloadsUiState> = getDownloadsUseCase()
@@ -44,5 +46,22 @@ class DownloadsViewModel @Inject constructor(
         viewModelScope.launch {
             deleteDownloadUseCase(id)
         }
+    }
+
+    // pause/resume/cancel son fire-and-forget hacia el Service vía Intent;
+    // no se espera un resultado aquí porque la UI ya observa el cambio de
+    // status a través de getDownloadsUseCase() (Flow sobre Room), que se
+    // actualiza cuando DownloadOrchestrator persiste el nuevo estado.
+
+    fun pauseDownload(id: Long) {
+        downloadManager.pause(id)
+    }
+
+    fun resumeDownload(id: Long) {
+        downloadManager.resume(id)
+    }
+
+    fun cancelDownload(id: Long) {
+        downloadManager.cancel(id)
     }
 }

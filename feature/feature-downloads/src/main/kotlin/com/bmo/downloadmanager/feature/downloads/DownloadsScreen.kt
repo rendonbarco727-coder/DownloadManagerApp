@@ -62,6 +62,10 @@ fun DownloadsScreen(
                                 DownloadItem(
                                     download = download,
                                     onDelete = { viewModel.deleteDownload(download.id) },
+                                    onPause = { viewModel.pauseDownload(download.id) },
+                                    onResume = { viewModel.resumeDownload(download.id) },
+                                    onCancel = { viewModel.cancelDownload(download.id) },
+                                    onRetry = { viewModel.resumeDownload(download.id) },
                                 )
                             }
                         }
@@ -76,6 +80,10 @@ fun DownloadsScreen(
 private fun DownloadItem(
     download: Download,
     onDelete: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     val progress = if (download.totalBytes > 0) {
         download.downloadedBytes.toFloat() / download.totalBytes.toFloat()
@@ -98,13 +106,6 @@ private fun DownloadItem(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onDelete) {
-                    Text(
-                        text = "Eliminar",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -121,6 +122,68 @@ private fun DownloadItem(
                     text = "${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
                 )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DownloadActions(
+                status = download.status,
+                onDelete = onDelete,
+                onPause = onPause,
+                onResume = onResume,
+                onCancel = onCancel,
+                onRetry = onRetry,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DownloadActions(
+    status: DownloadStatus,
+    onDelete: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when (status) {
+            DownloadStatus.DOWNLOADING -> {
+                TextButton(onClick = onPause) {
+                    Text("Pausar")
+                }
+                TextButton(onClick = onCancel) {
+                    Text("Cancelar", color = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            DownloadStatus.PAUSED, DownloadStatus.QUEUED, DownloadStatus.PENDING -> {
+                TextButton(onClick = onResume) {
+                    Text("Reanudar")
+                }
+                TextButton(onClick = onCancel) {
+                    Text("Cancelar", color = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            DownloadStatus.FAILED -> {
+                TextButton(onClick = onRetry) {
+                    Text("Reintentar")
+                }
+                TextButton(onClick = onDelete) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            DownloadStatus.COMPLETED, DownloadStatus.CANCELLED -> {
+                TextButton(onClick = onDelete) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
