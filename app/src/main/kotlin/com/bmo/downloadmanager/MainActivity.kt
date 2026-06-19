@@ -3,35 +3,74 @@ package com.bmo.downloadmanager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.bmo.downloadmanager.core.ui.theme.DownloadManagerTheme
+import com.bmo.downloadmanager.navigation.AppDestination
+import com.bmo.downloadmanager.navigation.AppNavHost
 import dagger.hilt.android.AndroidEntryPoint
 
-/**
- * Activity única de la app (patrón single-activity + Navigation Compose).
- * Por ahora solo confirma que el árbol de compilación end-to-end funciona:
- * app -> core-ui -> Compose, y que Hilt inyecta correctamente en una Activity.
- * La navegación real entre feature-* se conecta en un módulo posterior.
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            DownloadManagerRoot()
-        }
+        setContent { DownloadManagerRoot() }
     }
 }
 
 @Composable
 private fun DownloadManagerRoot() {
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Text(text = "Download Manager — Módulo 1 en construcción")
+    DownloadManagerTheme {
+        Surface {
+            val navController = rememberNavController()
+            Scaffold(
+                bottomBar = { AppBottomBar(navController) }
+            ) { padding ->
+                AppNavHost(
+                    navController = navController,
+                    modifier = Modifier.padding(padding),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppBottomBar(navController: NavHostController) {
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination
+
+    NavigationBar {
+        AppDestination.entries.forEach { destination ->
+            val selected = currentRoute?.hierarchy
+                ?.any { it.route == destination.route } == true
+            NavigationBarItem(
+                selected = selected,
+                onClick = {
+                    navController.navigate(destination.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState    = true
+                    }
+                },
+                icon  = { Text(destination.emoji, style = MaterialTheme.typography.titleMedium) },
+                label = { Text(destination.label) },
+            )
         }
     }
 }

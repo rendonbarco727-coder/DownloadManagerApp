@@ -48,9 +48,9 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":feature:feature-downloads"))
     implementation(project(":feature:feature-browser"))
-    // implementation(project(":feature:feature-history"))  // TODO: módulo pendiente
+    implementation(project(":feature:feature-history"))
     implementation(project(":feature:feature-media"))
-    // implementation(project(":feature:feature-settings"))  // TODO: módulo pendiente
+    implementation(project(":feature:feature-settings"))
 
     implementation(libs.core.ktx)
     implementation(libs.lifecycle.runtime.ktx)
