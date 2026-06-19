@@ -44,6 +44,7 @@ dependencies {
     implementation(project(":core:core-network"))
     implementation(project(":core:core-database"))
     implementation(project(":core:core-ui"))
+    implementation(project(":core:core-downloader"))
     implementation(project(":domain"))
     implementation(project(":data"))
     implementation(project(":feature:feature-downloads"))
