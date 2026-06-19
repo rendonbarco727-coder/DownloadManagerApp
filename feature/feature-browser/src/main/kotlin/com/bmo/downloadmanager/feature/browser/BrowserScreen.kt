@@ -7,6 +7,9 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -37,27 +40,63 @@ fun BrowserScreen(
         }
     }
 
-    val detectedMedia = uiState.detectedMediaUrl
-    if (detectedMedia != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissMediaDialog,
-            title = { Text("URL de video detectada") },
-            text = {
-                Text(
-                    "Se detectó una URL de media. ¿Deseas descargarla?\n\n" +
-                        detectedMedia.first.take(80) +
-                        (if (detectedMedia.first.length > 80) "…" else "")
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.enqueueMediaDownload(detectedMedia.first, detectedMedia.second)
-                }) { Text("⬇ Descargar") }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissMediaDialog) { Text("Ignorar") }
-            },
-        )
+    // BottomSheet de URLs detectadas
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    if (uiState.showMediaSheet) {
+        ModalBottomSheet(
+            onDismissRequest = viewModel::closeMediaSheet,
+            sheetState = sheetState,
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "URLs de media detectadas (${uiState.detectedMediaUrls.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    TextButton(onClick = viewModel::clearDetectedMediaUrls) {
+                        Text("Limpiar")
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(uiState.detectedMediaUrls) { (url, referer) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = url.substringAfterLast('/').substringBefore('?')
+                                        .ifBlank { url.take(60) },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    text = url.take(60) + if (url.length > 60) "…" else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                            TextButton(onClick = {
+                                viewModel.enqueueMediaDownload(url, referer)
+                            }) {
+                                Text("⬇")
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
     }
 
     Scaffold(
@@ -93,6 +132,19 @@ fun BrowserScreen(
                         ),
                         textStyle = MaterialTheme.typography.bodySmall,
                     )
+                    // Botón ⬇ con badge — solo visible si hay URLs detectadas
+                    val mediaCount = uiState.detectedMediaUrls.size
+                    if (mediaCount > 0) {
+                        BadgedBox(
+                            badge = {
+                                Badge { Text(mediaCount.toString()) }
+                            }
+                        ) {
+                            TextButton(onClick = viewModel::openMediaSheet) {
+                                Text("⬇", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
                     TextButton(onClick = viewModel::newTab) {
                         Text("+", style = MaterialTheme.typography.titleMedium)
                     }

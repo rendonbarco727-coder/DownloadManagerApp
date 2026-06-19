@@ -31,7 +31,8 @@ data class BrowserUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val downloadStartedMessage: String? = null,
-    val detectedMediaUrl: Pair<String, String?>? = null, // url, referer
+    val detectedMediaUrls: List<Pair<String, String?>> = emptyList(), // url, referer
+    val showMediaSheet: Boolean = false,
 )
 
 @HiltViewModel
@@ -145,7 +146,7 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun onPageStarted() {
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isLoading = true, detectedMediaUrls = emptyList()) }
     }
 
     /**
@@ -190,7 +191,23 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun onMediaUrlDetected(url: String, referer: String?) {
-        _uiState.update { it.copy(detectedMediaUrl = Pair(url, referer)) }
+        _uiState.update { state ->
+            val already = state.detectedMediaUrls.any { it.first == url }
+            if (already) state
+            else state.copy(detectedMediaUrls = state.detectedMediaUrls + Pair(url, referer))
+        }
+    }
+
+    fun openMediaSheet() {
+        _uiState.update { it.copy(showMediaSheet = true) }
+    }
+
+    fun closeMediaSheet() {
+        _uiState.update { it.copy(showMediaSheet = false) }
+    }
+
+    fun clearDetectedMediaUrls() {
+        _uiState.update { it.copy(detectedMediaUrls = emptyList(), showMediaSheet = false) }
     }
 
     fun enqueueMediaDownload(url: String, referer: String?) {
@@ -207,17 +224,13 @@ class BrowserViewModel @Inject constructor(
         )
         viewModelScope.launch {
             downloadManager.enqueue(download)
-            _uiState.update {
-                it.copy(
-                    detectedMediaUrl = null,
+            _uiState.update { state ->
+                state.copy(
+                    detectedMediaUrls = state.detectedMediaUrls.filter { it.first != url },
                     downloadStartedMessage = "Descarga iniciada: $fileName",
                 )
             }
         }
-    }
-
-    fun dismissMediaDialog() {
-        _uiState.update { it.copy(detectedMediaUrl = null) }
     }
 
     fun consumeDownloadStartedMessage() {
