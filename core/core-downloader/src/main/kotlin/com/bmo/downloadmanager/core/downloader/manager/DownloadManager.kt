@@ -2,6 +2,8 @@ package com.bmo.downloadmanager.core.downloader.manager
 
 import android.content.Context
 import com.bmo.downloadmanager.core.common.result.AppResult
+import com.bmo.downloadmanager.core.common.settings.SettingsKeys
+import com.bmo.downloadmanager.domain.usecase.settings.GetSettingUseCase
 import com.bmo.downloadmanager.domain.enums.DownloadStatus
 import com.bmo.downloadmanager.domain.model.Download
 import com.bmo.downloadmanager.domain.repository.DownloadRepository
@@ -26,10 +28,20 @@ import javax.inject.Singleton
 class DownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val downloadRepository: DownloadRepository,
+    private val getSettingUseCase: GetSettingUseCase,
 ) {
 
     suspend fun enqueue(download: Download): Long {
-        val toInsert = download.copy(status = DownloadStatus.QUEUED)
+        val segmentsResult = getSettingUseCase(SettingsKeys.DOWNLOAD_SEGMENTS)
+        val segments = if (segmentsResult is AppResult.Success) {
+            segmentsResult.data?.value?.toIntOrNull() ?: 4
+        } else {
+            4
+        }
+        val toInsert = download.copy(
+            status = DownloadStatus.QUEUED,
+            totalSegments = if (download.totalSegments == 1) segments else download.totalSegments,
+        )
         val result = downloadRepository.insertDownload(toInsert)
 
         val id = when (result) {

@@ -2,6 +2,8 @@ package com.bmo.downloadmanager.feature.browser
 
 import android.annotation.SuppressLint
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -33,6 +35,29 @@ fun BrowserScreen(
             snackbarHostState.showSnackbar(message)
             viewModel.consumeDownloadStartedMessage()
         }
+    }
+
+    val detectedMedia = uiState.detectedMediaUrl
+    if (detectedMedia != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissMediaDialog,
+            title = { Text("URL de video detectada") },
+            text = {
+                Text(
+                    "Se detectó una URL de media. ¿Deseas descargarla?\n\n" +
+                        detectedMedia.first.take(80) +
+                        (if (detectedMedia.first.length > 80) "…" else "")
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.enqueueMediaDownload(detectedMedia.first, detectedMedia.second)
+                }) { Text("⬇ Descargar") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissMediaDialog) { Text("Ignorar") }
+            },
+        )
     }
 
     Scaffold(
@@ -106,6 +131,7 @@ fun BrowserScreen(
                             pageUrl = pageUrl,
                         )
                     },
+                    onMediaUrlDetected = viewModel::onMediaUrlDetected,
                 )
             } else {
                 Box(
@@ -178,6 +204,7 @@ private fun BrowserWebView(
         contentLength: Long,
         pageUrl: String?,
     ) -> Unit,
+    onMediaUrlDetected: (url: String, referer: String?) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
 
@@ -194,6 +221,22 @@ private fun BrowserWebView(
                     }
                     override fun onPageFinished(view: WebView, url: String) {
                         onPageFinished(url, view.title)
+                    }
+                    override fun shouldInterceptRequest(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): WebResourceResponse? {
+                        val url = request.url.toString()
+                        val acceptHeader = request.requestHeaders["Accept"] ?: ""
+                        val isMedia = url.contains(".m3u8") ||
+                            url.contains(".mp4") ||
+                            url.contains(".mkv") ||
+                            url.contains(".avi") ||
+                            acceptHeader.contains("video")
+                        if (isMedia) {
+                            onMediaUrlDetected(url, request.requestHeaders["Referer"])
+                        }
+                        return null
                     }
                 }
                 webChromeClient = WebChromeClient()

@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bmo.downloadmanager.core.common.result.AppResult
 import com.bmo.downloadmanager.core.downloader.manager.DownloadManager
+import com.bmo.downloadmanager.domain.model.BrowserHistory
 import com.bmo.downloadmanager.domain.model.BrowserTab
 import com.bmo.downloadmanager.domain.model.Download
+import com.bmo.downloadmanager.domain.usecase.browser.InsertBrowserHistoryUseCase
 import com.bmo.downloadmanager.domain.usecase.tab.DeleteBrowserTabUseCase
 import com.bmo.downloadmanager.domain.usecase.tab.GetBrowserTabsUseCase
 import com.bmo.downloadmanager.domain.usecase.tab.InsertBrowserTabUseCase
@@ -29,10 +31,12 @@ data class BrowserUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val downloadStartedMessage: String? = null,
+    val detectedMediaUrl: Pair<String, String?>? = null, // url, referer
 )
 
 @HiltViewModel
 class BrowserViewModel @Inject constructor(
+    private val insertBrowserHistoryUseCase: InsertBrowserHistoryUseCase,
     private val getTabsUseCase: GetBrowserTabsUseCase,
     private val insertTabUseCase: InsertBrowserTabUseCase,
     private val updateTabUseCase: UpdateBrowserTabUseCase,
@@ -129,6 +133,13 @@ class BrowserViewModel @Inject constructor(
                     lastAccessedAt = System.currentTimeMillis(),
                 )
             )
+            insertBrowserHistoryUseCase(
+                BrowserHistory(
+                    url = url,
+                    title = title,
+                    lastVisitedAt = System.currentTimeMillis(),
+                )
+            )
         }
         _uiState.update { it.copy(urlBarText = url, isLoading = false) }
     }
@@ -176,6 +187,37 @@ class BrowserViewModel @Inject constructor(
             downloadManager.enqueue(download)
             _uiState.update { it.copy(downloadStartedMessage = "Descarga iniciada: $fileName") }
         }
+    }
+
+    fun onMediaUrlDetected(url: String, referer: String?) {
+        _uiState.update { it.copy(detectedMediaUrl = Pair(url, referer)) }
+    }
+
+    fun enqueueMediaDownload(url: String, referer: String?) {
+        val fileName = extractFileName(url, null)
+        val destinationDir = downloadsDirectory()
+        val destinationUri = File(destinationDir, fileName).absolutePath
+        val download = Download(
+            sourceUrl = url,
+            fileName = fileName,
+            destinationUri = destinationUri,
+            mimeType = null,
+            totalBytes = -1L,
+            refererHeader = referer,
+        )
+        viewModelScope.launch {
+            downloadManager.enqueue(download)
+            _uiState.update {
+                it.copy(
+                    detectedMediaUrl = null,
+                    downloadStartedMessage = "Descarga iniciada: $fileName",
+                )
+            }
+        }
+    }
+
+    fun dismissMediaDialog() {
+        _uiState.update { it.copy(detectedMediaUrl = null) }
     }
 
     fun consumeDownloadStartedMessage() {
